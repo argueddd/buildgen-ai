@@ -37,10 +37,8 @@ BuildGen AI 是一个用于自动生成建筑项目报告的系统，包含数�
 
 ## 技术选型
 
-- 后端：Python 3.10+, FastAPI
+- 后端：Python 3.12+, FastAPI
 - 前端：React, TypeScript
 - 模型服务：Qwen2.5-72B、QWQ3 / 本地 LLM
 - 向量索引：ChromaDB、Attu
 - 文档处理：PyMuPDF, python-docx
-
-## 项目结构
