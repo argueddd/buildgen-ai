@@ -24,3 +24,6 @@ env/
 .cache/
 .pytest_cache/
 
+/data
+/config/volumes
+/config/llm_config.yaml
