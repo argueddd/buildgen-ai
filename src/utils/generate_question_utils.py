@@ -1,3 +1,4 @@
+import json
 import re
 
 def parse_questions(text, max_count=3):
@@ -12,6 +13,19 @@ def parse_questions(text, max_count=3):
         f"question{i + 1}": questions[i] if i < len(questions) else ""
         for i in range(max_count)
     }
+
+
+def extract_json_block(text):
+    # 从 LLM 输出中提取 JSON 段（支持 ```json ``` 包裹或裸 JSON）。
+    match = re.search(r"```json\s*($begin:math:display$.*?$end:math:display$|\{.*?\})\s*```", text, re.DOTALL)
+    if match:
+        return json.loads(match.group(1).strip())
+    # 匹配裸 JSON 格式（不含 markdown 包裹）
+    match = re.search(r"(\[.*\]|\{.*\})", text, re.DOTALL)
+    if match:
+        return json.loads(match.group(1).strip())
+    return ""
+
 
 
 def fill_questions_into_chunk(chunk: dict, questions: list) -> dict:
