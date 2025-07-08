@@ -50,31 +50,6 @@ def split_markdown_with_parent_titles(md_text: str) -> List[Dict]:
     flush_buffer()
     return chunks
 
-
-def normalize_chunk_fields(chunks, source_file=""):
-    """
-    填补 chunk 所需的字段，使其与 schema 对齐。
-    """
-    normalized = []
-    for chunk in chunks:
-        normalized.append({
-            "section": chunk.get("section", ""),
-            "title": chunk.get("title", ""),
-            "parent_section": chunk.get("parent_section", ""),
-            "parent_title": chunk.get("parent_title", ""),
-            "content": chunk.get("content", "").strip(),
-
-            # 下面是 schema 中需要但原始 chunk 缺失的字段
-            "question1": chunk.get("question1", ""),
-            "question2": chunk.get("question2", ""),
-            "question3": chunk.get("question3", ""),
-            "summary": chunk.get("summary", ""),
-            "tag1": chunk.get("tag1", ""),
-            "tag2": chunk.get("tag2", ""),
-            "tag3": chunk.get("tag3", ""),
-            "source_file": chunk.get("source_file", source_file)
-        })
-    return normalized
 # 示例使用
 if __name__ == "__main__":
     with open("./data/output/JC-T2706-2022_石膏保温砂浆.md", "r", encoding="utf-8") as f:

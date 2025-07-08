@@ -1,5 +1,5 @@
 from src.envoke_llm import LLMAPIFactory
-from src.utils.generate_question_utils import parse_questions
+from src.utils.generate_question_utils import parse_questions, extract_json_block
 from src.utils.llm_utils import load_template_and_fill
 
 
@@ -10,4 +10,4 @@ def generate_questions_for_chunk(chunk):
         **chunk
     )
     llm_ans = retrial_llm.block_chat(prompt)
-    return parse_questions(llm_ans)  # 返回 dict {"question1": "...", ...}
+    return extract_json_block(llm_ans)
