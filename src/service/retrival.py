@@ -1,4 +1,4 @@
-from src.milvus_db import MilvusDbManager
+from src.infrastructure.milvus_db import MilvusDbManager
 
 manager = MilvusDbManager(collection_name="specs_architecture")
 results = manager.search("非潮湿环境做保温层", limit=3)
