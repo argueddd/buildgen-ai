@@ -3,7 +3,7 @@ import json
 import requests
 from openai import OpenAI
 
-from src.utils.llm_utils import get_llm_config, collect_stream, load_template_and_fill
+from backend.src.utils.llm_utils import get_llm_config, collect_stream, load_template_and_fill
 
 API_KEY, BASE_URL, MODEL_TYPE = get_llm_config()
 
