@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+@import 'nprogress/nprogress.css';
+
+
+@layer base {
+  body {
+    @apply bg-gray-900 text-gray-100 font-sans;
+  }
+}
+
+/* 改变 nprogress 默认容器位置 */
+#nprogress .bar {
+  background: #3b82f6; /* Tailwind 蓝色 */
+  height: 4px;
+  position: relative;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+
+/* 隐藏顶部固定位置的样式 */
+#nprogress {
+  pointer-events: none;
+  position: static; /* 不再固定在页面顶部 */
+  margin-top: 0.5rem;
+}
+
+#nprogress .peg {
+  display: none;
+}

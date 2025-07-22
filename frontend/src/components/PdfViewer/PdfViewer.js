@@ -1,27 +1,15 @@
-import React, { useState } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+// src/components/PdfViewer/PdfViewer.js
+import React from 'react';
+import { Viewer, Worker } from '@react-pdf-viewer/core';
+import '@react-pdf-viewer/core/lib/styles/index.css';
+import '@react-pdf-viewer/default-layout/lib/styles/index.css';
 
-
-// 设置 worker 路径
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
-export default function PdfViewer({ fileUrl, page = 1 }) {
-  const [numPages, setNumPages] = useState(null);
-
+export default function PdfViewer({ fileUrl }) {
   return (
-    <div className="border rounded-xl bg-white p-4 shadow max-w-3xl mx-auto">
-      <Document
-        file={fileUrl}
-        onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-        loading="📄 正在加载 PDF..."
-        error="❌ 加载失败，请检查文件路径"
-      >
-        <Page pageNumber={page} width={600} />
-      </Document>
-      <p className="text-sm text-gray-500 mt-2 text-center">
-        第 {page} 页 / 共 {numPages || '-'} 页
-      </p>
+    <div className="border rounded-xl bg-white p-4 shadow max-h-[700px] overflow-y-auto">
+      <Worker workerUrl={`https://unpkg.com/pdfjs-dist@3.4.120/build/pdf.worker.min.js`}>
+        <Viewer fileUrl={fileUrl} />
+      </Worker>
     </div>
   );
 }
