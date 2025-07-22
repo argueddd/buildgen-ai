@@ -2,18 +2,20 @@ import os
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from backend.src.infrastructure.milvus_db import MilvusDbManager
+from src.infrastructure.milvus_db import MilvusDbManager
 from flask import send_from_directory
 
 app = Flask(__name__)
 CORS(app)  # 允许跨域访问前端 localhost:3000 请求
 
 
-PDF_DIR = '../data/JG'  # 你存 PDF 的真实目录
+PDF_DIR = os.path.join(os.path.dirname(__file__), '../data/JG')
+
 
 @app.route('/pdfs/<path:filename>')
 def serve_pdf(filename):
     file_path = os.path.join(PDF_DIR, filename)
+    print("file_path", file_path)
     if not os.path.isfile(file_path):
         return jsonify({'error': '文件不存在'}), 404
     return send_from_directory(PDF_DIR, filename)
@@ -31,6 +33,7 @@ def search_endpoint():
     manager = MilvusDbManager(collection_name="specs_architecture")
     results = manager.search(query_text=query, limit=limit)
 
+    print("search results:", results)
     return jsonify({"results": results})
 
 if __name__ == '__main__':

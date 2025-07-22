@@ -6,8 +6,15 @@ export default function ReportPreview({ report, onSelect }) {
   const [showJson, setShowJson] = useState(false);
   const [showPdf, setShowPdf] = useState(false);
 
-  const encodedFile = encodeURIComponent(report.source_file);
+  let fileName = report.source_file;
+  if (!fileName.endsWith('.pdf')) {
+    fileName += '.pdf';
+  }
+  const encodedFile = encodeURIComponent(fileName);
   const fileUrl = `http://localhost:8010/pdfs/${encodedFile}`;
+  console.log('fileUrl:', fileUrl);
+  const pageNum = Number(report.page_num);
+  console.log('page_num:', pageNum);
 
   return (
     <motion.div
@@ -71,6 +78,16 @@ export default function ReportPreview({ report, onSelect }) {
         >
           {showPdf ? '📕 收起条文' : '📘 查看条文'}
         </button>
+        <button
+          className="bg-purple-100 text-purple-800 px-3 py-1 rounded text-sm hover:bg-purple-200 transition"
+          onClick={() => {
+            // 新窗口打开 PDF 并跳转到指定页码
+            const urlWithPage = `${fileUrl}#page=${pageNum}`;
+            window.open(urlWithPage, '_blank');
+          }}
+        >
+          🌐 新窗口打开PDF
+        </button>
       </div>
 
       {/* JSON 动画区 */}
@@ -98,7 +115,7 @@ export default function ReportPreview({ report, onSelect }) {
             transition={{ duration: 0.4 }}
             className="mt-6"
           >
-            <PdfViewer fileUrl={fileUrl} page={report.page_num} />
+            <PdfViewer key={fileUrl + '-' + pageNum} fileUrl={fileUrl} page={pageNum} />
           </motion.div>
         )}
       </AnimatePresence>

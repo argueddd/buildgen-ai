@@ -127,7 +127,7 @@ class MilvusDbManager:
                         "question2": hit.entity.get("question2"),
                         "source_file": hit.entity.get("source_file"),
                         "field": field,
-                        "page_num": 2,
+                        "page_num": 5,
                         "score": hit.distance * weight
                     })
 

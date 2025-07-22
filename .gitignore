@@ -43,5 +43,4 @@ data.zip
 /data
 .idea
 config/volumes
-/node_modules
-**/node_modules
+frontend/node_modules
