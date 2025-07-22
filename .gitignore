@@ -1,29 +1,47 @@
-# 忽略 IDE 配置
-.idea/
-
-# Python 缓存与构建文件
-__pycache__/
-*.py[cod]
-*.pyo
-*.egg-info/
+# Node.js
+node_modules/
 build/
 dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env.*
 
-# 虚拟环境
+# Python
 .venv/
 venv/
-env/
-
-# 环境变量
-.env
-*.env
-
-# 日志与缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
 *.log
+
+# macOS
+.DS_Store
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# 临时/大文件
+*.swp
+*.swo
 *.tmp
-.cache/
-.pytest_cache/
+data.zip
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# VSCode
+.vscode/
+
 
 /data
-/config/volumes
-/config/llm_config.yaml
+.idea
+config/volumes
+/node_modules
+**/node_modules
