@@ -70,17 +70,17 @@ export default function PdfUpload({ onClose, onUpload }) {
       
       if (response.data.success) {
         setUploadProgress(100);
-        setUploadStatus('处理完成！');
+        setUploadStatus('上传完成！后台处理中...\n1/5 文件验证中...');
         
         // 创建新的PDF对象
         const newPdf = {
-          id: Date.now(),
+          id: response.data.file_id, // 使用后端返回的ID
           name: file.name,
           date: new Date().toISOString().split('T')[0],
           size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
-          status: 'completed',
-          fileUrl: `http://localhost:8010/uploads/${response.data.filename}`,
-          chunksCount: response.data.chunks_count
+          status: response.data.status || 'uploading', // 使用后端返回的状态
+          fileUrl: `http://localhost:8010/uploads/${file.name}`,
+          chunksCount: 0 // 初始为0，处理完成后会更新
         };
 
         // 延迟关闭，让用户看到完成状态

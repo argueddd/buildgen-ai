@@ -11,12 +11,19 @@ export default function PdfViewer({ fileUrl, page }) {
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(page || 1);
   const [inputPage, setInputPage] = useState(page || 1);
+  const [error, setError] = useState(null);
 
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages);
+    setError(null);
     // 如果外部 page 变了，自动跳转
     setCurrentPage(page || 1);
     setInputPage(page || 1);
+  };
+
+  const onDocumentLoadError = (error) => {
+    console.error('PDF加载失败:', error);
+    setError('PDF文件加载失败，请检查文件是否存在');
   };
 
   const goToPage = (p) => {
@@ -28,9 +35,20 @@ export default function PdfViewer({ fileUrl, page }) {
 
   return (
     <div className="border rounded-xl bg-white p-4 shadow max-h-[700px] overflow-y-auto">
-      <Document file={fileUrl} onLoadSuccess={onDocumentLoadSuccess}>
-        <Page pageNumber={currentPage} />
-      </Document>
+      {error ? (
+        <div className="text-center py-8 text-red-500">
+          <p>{error}</p>
+          <p className="text-sm text-gray-500 mt-2">URL: {fileUrl}</p>
+        </div>
+      ) : (
+        <Document 
+          file={fileUrl} 
+          onLoadSuccess={onDocumentLoadSuccess}
+          onLoadError={onDocumentLoadError}
+        >
+          <Page pageNumber={currentPage} />
+        </Document>
+      )}
       <div className="flex items-center justify-center gap-2 mt-4">
         <button
           className="px-2 py-1 bg-gray-200 rounded hover:bg-gray-300"

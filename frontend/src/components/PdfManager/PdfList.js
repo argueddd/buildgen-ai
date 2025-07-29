@@ -6,7 +6,8 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showUpload, setShowUpload] = useState(false);
-  const [loading, setLoading] = useState(false);
+                const [loading, setLoading] = useState(false);
+              const [processingPdfs, setProcessingPdfs] = useState(new Set());
 
   // 获取PDF列表
   const fetchPdfList = async () => {
@@ -29,12 +30,45 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
     fetchPdfList();
   }, []);
 
+  // 检查正在处理的PDF状态
+  useEffect(() => {
+    const checkProcessingStatus = async () => {
+      const processingIds = Array.from(processingPdfs);
+      if (processingIds.length === 0) return;
+
+      for (const fileId of processingIds) {
+        try {
+          const response = await axios.get(`http://localhost:8010/processed/${fileId}`);
+          if (response.data.status === 'completed' || response.data.status === 'failed') {
+            // 处理完成，从处理列表中移除
+            setProcessingPdfs(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(fileId);
+              return newSet;
+            });
+            // 刷新列表
+            fetchPdfList();
+          }
+        } catch (error) {
+          console.error('检查处理状态失败:', error);
+        }
+      }
+    };
+
+    const interval = setInterval(checkProcessingStatus, 3000); // 每3秒检查一次
+    return () => clearInterval(interval);
+  }, [processingPdfs]);
+
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed':
         return 'bg-green-100 text-green-800';
+      case 'uploading':
+        return 'bg-blue-100 text-blue-800';
       case 'processing':
         return 'bg-yellow-100 text-yellow-800';
+      case 'failed':
+        return 'bg-red-100 text-red-800';
       case 'pending':
         return 'bg-gray-100 text-gray-800';
       default:
@@ -46,8 +80,12 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
     switch (status) {
       case 'completed':
         return '已完成';
+      case 'uploading':
+        return '上传中';
       case 'processing':
         return '处理中';
+      case 'failed':
+        return '处理失败';
       case 'pending':
         return '未处理';
       default:
@@ -65,6 +103,11 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
     onPdfUpload(newPdf);
     // 上传成功后刷新列表
     fetchPdfList();
+    
+    // 如果是上传中状态，添加到处理列表
+    if (newPdf.status === 'uploading') {
+      setProcessingPdfs(prev => new Set([...prev, newPdf.id]));
+    }
   };
 
   return (
@@ -148,9 +191,26 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
                       )}
                     </div>
                     <div className="mt-2">
-                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(pdf.status)}`}>
+                      <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(pdf.status)}`}>
+                        {pdf.status === 'uploading' && (
+                          <div className="w-3 h-3 mr-1 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                        )}
                         {getStatusText(pdf.status)}
                       </span>
+                      {pdf.processing_steps && (pdf.status === 'uploading' || pdf.status === 'processing') && (
+                        <div className="mt-1 text-xs text-gray-600">
+                          <div className="flex items-center justify-between">
+                            <span>{pdf.processing_steps.description}</span>
+                            <span>{pdf.processing_steps.current_step}/{pdf.processing_steps.total_steps}</span>
+                          </div>
+                          <div className="mt-1 w-full bg-gray-200 rounded-full h-1">
+                            <div 
+                              className="bg-blue-600 h-1 rounded-full transition-all duration-300"
+                              style={{ width: `${(pdf.processing_steps.current_step / pdf.processing_steps.total_steps) * 100}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <button

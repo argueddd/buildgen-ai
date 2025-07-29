@@ -18,7 +18,7 @@ app = Flask(__name__)
 CORS(app)
 
 PDF_DIR = '/data/JG'  # This path was a point of contention and needed user to verify/change
-UPLOAD_DIR = './uploads'  # 原始PDF存储
+UPLOAD_DIR = '../uploads'  # 原始PDF存储
 PROCESSED_DIR = './processed_pdfs'  # 已处理的PDF信息存储
 TEMP_DIR = './temp'
 
@@ -55,7 +55,7 @@ def search_endpoint():
 
 @app.route('/upload-pdf', methods=['POST'])
 def upload_pdf():
-    """PDF上传和处理接口"""
+    """PDF上传接口（立即返回，后台处理）"""
     try:
         if 'file' not in request.files:
             return jsonify({'error': '没有文件'}), 400
@@ -67,39 +67,122 @@ def upload_pdf():
         if not file.filename.lower().endswith('.pdf'):
             return jsonify({'error': '只支持PDF文件'}), 400
 
-        # 生成唯一文件名
+        # 生成唯一ID，但保持原文件名
         file_id = str(uuid.uuid4())
         original_filename = file.filename
-        pdf_filename = f"{file_id}_{original_filename}"
+        pdf_filename = original_filename  # 保持原文件名
         pdf_path = os.path.join(UPLOAD_DIR, pdf_filename)
 
         # 保存上传的PDF
         file.save(pdf_path)
 
+        # 创建初始处理信息（状态为uploading）
+        processed_info = {
+            'id': file_id,
+            'original_name': original_filename,
+            'filename': pdf_filename,
+            'upload_date': datetime.now().isoformat(),
+            'file_size': os.path.getsize(pdf_path),
+            'chunks_count': 0,
+            'status': 'uploading',
+            'md_content': '',
+            'chunks': [],
+            'processing_steps': {
+                'current_step': 0,
+                'total_steps': 5,
+                'description': '等待处理...'
+            }
+        }
+
+        # 保存初始信息
+        info_file = os.path.join(PROCESSED_DIR, f"{file_id}.json")
+        with open(info_file, 'w', encoding='utf-8') as f:
+            json.dump(processed_info, f, ensure_ascii=False, indent=2)
+
+        # 启动后台处理
+        import threading
+        thread = threading.Thread(target=process_pdf_background, args=(pdf_path, file_id, original_filename, pdf_filename))
+        thread.daemon = True
+        thread.start()
+
+        return jsonify({
+            'success': True,
+            'message': 'PDF上传成功，正在后台处理中...',
+            'filename': pdf_filename,
+            'file_id': file_id,
+            'status': 'uploading'
+        })
+
+    except Exception as e:
+        print(f"PDF上传失败: {e}")
+        return jsonify({'error': f'PDF上传失败: {str(e)}'}), 500
+
+
+def process_pdf_background(pdf_path, file_id, original_filename, pdf_filename):
+    """后台处理PDF文件"""
+    try:
+        print(f"开始后台处理PDF: {pdf_filename}")
+        
+        # 步骤1: 文件验证 (1/5)
+        update_processing_status(file_id, 'processing', '文件验证中...', 1, 5)
+        if not os.path.exists(pdf_path):
+            update_processing_status(file_id, 'failed', 'PDF文件不存在')
+            return
+        
         # 创建临时目录用于处理
         temp_dir = os.path.join(TEMP_DIR, file_id)
         os.makedirs(temp_dir, exist_ok=True)
 
-        # 步骤1: PDF转Markdown
+        # 步骤2: PDF解析 (2/5)
+        update_processing_status(file_id, 'processing', 'PDF解析中...', 2, 5)
+        print(f"开始解析PDF: {pdf_filename}")
+        
+        # 步骤3: PDF转Markdown (3/5)
+        update_processing_status(file_id, 'processing', 'PDF转Markdown中...', 3, 5)
         print(f"开始转换PDF: {pdf_filename}")
         md_path = convert_pdf_to_markdown(pdf_path, temp_dir)
 
         if not md_path:
-            return jsonify({'error': 'PDF转换失败'}), 500
+            update_processing_status(file_id, 'failed', f'PDF转换失败: {pdf_filename}')
+            return
 
-        # 步骤2: 读取Markdown内容
+        # 步骤4: 内容切片 (4/5)
+        update_processing_status(file_id, 'processing', '内容切片中...', 4, 5)
+        print("开始切片处理...")
+        
+        # 读取Markdown内容
         with open(md_path, 'r', encoding='utf-8') as f:
             md_content = f.read()
 
-        # 步骤3: 切片处理
-        print("开始切片处理...")
+        # 分割成chunks
         chunks = split_markdown_merge_recursively(md_content)
+        
+        # 为每个chunk生成问题和tags
+        print("为chunks生成问题和tags...")
+        for i, chunk in enumerate(chunks):
+            try:
+                print(f"处理chunk {i+1}/{len(chunks)}...")
+                # 生成问题
+                questions_tag_dict = generate_questions_for_chunk(chunk)
+                print(f"生成结果: {questions_tag_dict}")
+                # 将问题和tags添加到chunk中
+                chunk.update(questions_tag_dict)
+            except Exception as e:
+                print(f"为chunk {i+1}生成问题失败: {e}")
+                # 如果生成失败，添加空的tags
+                chunk.update({
+                    'question1': '',
+                    'question2': '',
+                    'question3': '',
+                    'tags': ''
+                })
 
-        # 步骤4: 存储到Milvus
+        # 步骤5: 存储到数据库 (5/5)
+        update_processing_status(file_id, 'processing', f'存储到数据库 ({len(chunks)} chunks)...', 5, 5)
         print(f"开始存储 {len(chunks)} 个chunks到Milvus...")
         save_chunks_to_milvus(chunks, pdf_filename, "specs_architecture_v1")
 
-        # 步骤5: 保存处理信息到processed_pdfs目录
+        # 完成: 更新处理信息为完成状态
         processed_info = {
             'id': file_id,
             'original_name': original_filename,
@@ -108,29 +191,49 @@ def upload_pdf():
             'file_size': os.path.getsize(pdf_path),
             'chunks_count': len(chunks),
             'status': 'completed',
-            'md_content': md_content,  # 保存markdown内容
-            'chunks': chunks  # 保存切片信息
+            'md_content': md_content,
+            'chunks': chunks,
+            'processing_steps': {
+                'current_step': 5,
+                'total_steps': 5,
+                'description': '处理完成'
+            }
         }
 
-        # 保存处理信息到JSON文件
+        # 更新JSON文件
         info_file = os.path.join(PROCESSED_DIR, f"{file_id}.json")
         with open(info_file, 'w', encoding='utf-8') as f:
             json.dump(processed_info, f, ensure_ascii=False, indent=2)
 
         # 清理临时文件
         shutil.rmtree(temp_dir, ignore_errors=True)
-
-        return jsonify({
-            'success': True,
-            'message': f'PDF处理完成，共生成 {len(chunks)} 个chunks',
-            'filename': pdf_filename,
-            'chunks_count': len(chunks),
-            'file_id': file_id
-        })
+        
+        print(f"PDF处理完成: {pdf_filename}, {len(chunks)} chunks")
 
     except Exception as e:
-        print(f"处理PDF时出错: {str(e)}")
-        return jsonify({'error': f'处理失败: {str(e)}'}), 500
+        print(f"PDF后台处理失败: {e}")
+        update_processing_status(file_id, 'failed', str(e))
+
+
+def update_processing_status(file_id, status, description='', current_step=0, total_steps=0):
+    """更新处理状态"""
+    try:
+        info_file = os.path.join(PROCESSED_DIR, f"{file_id}.json")
+        if os.path.exists(info_file):
+            with open(info_file, 'r', encoding='utf-8') as f:
+                info = json.load(f)
+            
+            info['status'] = status
+            info['processing_steps'] = {
+                'current_step': current_step,
+                'total_steps': total_steps,
+                'description': description
+            }
+            
+            with open(info_file, 'w', encoding='utf-8') as f:
+                json.dump(info, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"更新处理状态失败: {e}")
 
 
 def convert_pdf_to_markdown(pdf_path, output_dir):
@@ -278,6 +381,36 @@ def get_processed_markdown(file_id):
 
     except Exception as e:
         return jsonify({'error': f'获取Markdown失败: {str(e)}'}), 500
+
+
+@app.route('/processing-status', methods=['GET'])
+def get_processing_status():
+    """获取所有正在处理的PDF状态"""
+    try:
+        processing_files = []
+        
+        if os.path.exists(PROCESSED_DIR):
+            for filename in os.listdir(PROCESSED_DIR):
+                if filename.endswith('.json'):
+                    info_file = os.path.join(PROCESSED_DIR, filename)
+                    try:
+                        with open(info_file, 'r', encoding='utf-8') as f:
+                            info = json.load(f)
+                        
+                        if info.get('status') in ['uploading', 'processing']:
+                            processing_files.append({
+                                'id': info['id'],
+                                'status': info['status'],
+                                'original_name': info['original_name']
+                            })
+                    except Exception as e:
+                        print(f"读取处理信息失败 {filename}: {e}")
+                        continue
+
+        return jsonify({'processing_files': processing_files})
+
+    except Exception as e:
+        return jsonify({'error': f'获取处理状态失败: {str(e)}'}), 500
 
 
 if __name__ == '__main__':
