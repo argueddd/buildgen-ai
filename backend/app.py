@@ -1,18 +1,19 @@
+import json
 import os
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from src.infrastructure.milvus_db import MilvusDbManager
-from flask import send_from_directory
-import tempfile
 import shutil
-from pathlib import Path
 import subprocess
-from src.service.split_md_into_chunks import split_markdown_merge_recursively
-from src.service.question_generator import generate_questions_for_chunk
-from src.utils.vector_utils import prepare_chunk_for_insert
 import uuid
 from datetime import datetime
-import json
+from pathlib import Path
+
+from flask import Flask, request, jsonify
+from flask import send_from_directory
+from flask_cors import CORS
+
+from backend.src.service.split_md_into_chunks import MarkdownChunker
+from backend.src.infrastructure.milvus_db import MilvusDbManager
+from backend.src.service.question_generator import generate_questions_for_chunk
+from backend.src.utils.vector_utils import prepare_chunk_for_insert
 
 app = Flask(__name__)
 CORS(app)
@@ -155,7 +156,8 @@ def process_pdf_background(pdf_path, file_id, original_filename, pdf_filename):
             md_content = f.read()
 
         # 分割成chunks
-        chunks = split_markdown_merge_recursively(md_content)
+        mdc = MarkdownChunker(md_content)
+        chunks = mdc.run()
         
         # 为每个chunk生成问题和tags
         print("为chunks生成问题和tags...")

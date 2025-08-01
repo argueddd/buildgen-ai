@@ -55,6 +55,7 @@ class MilvusDbManager:
         self.schema.add_field("tags", DataType.VARCHAR, max_length=256)
         self.schema.add_field("year", DataType.VARCHAR, max_length=256)
         self.schema.add_field("source_file", DataType.VARCHAR, max_length=256)
+        self.schema.add_field("text_role", DataType.VARCHAR, max_length=256)
         self.schema.add_field("is_material_chunk", DataType.BOOL)
 
         self.schema.add_field("content_vector", DataType.FLOAT_VECTOR, dim=self.dim)
