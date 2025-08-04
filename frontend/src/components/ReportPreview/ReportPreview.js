@@ -11,7 +11,7 @@ export default function ReportPreview({ report, onSelect }) {
     fileName += '.pdf';
   }
   const encodedFile = encodeURIComponent(fileName);
-  const fileUrl = `http://localhost:8010/pdfs/${encodedFile}`;
+  const fileUrl = `http://aireportbackend.s7.tunnelfrp.com/pdfs/${encodedFile}`;
   console.log('fileUrl:', fileUrl);
   const pageNum = Number(report.page_num);
   console.log('page_num:', pageNum);

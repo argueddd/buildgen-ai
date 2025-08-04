@@ -63,9 +63,9 @@ export default function PdfManagement() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="h-screen bg-gray-50 flex flex-col">
       {/* 顶部导航 */}
-      <div className="bg-white shadow-sm border-b">
+      <div className="bg-white shadow-sm border-b flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <h1 className="text-2xl font-bold text-gray-900">AI辅助报告生成系统</h1>
@@ -75,10 +75,10 @@ export default function PdfManagement() {
       </div>
 
       {/* 主内容区域 */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
           {/* 左侧：PDF列表 */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 h-full">
             <PdfList
               pdfList={pdfList}
               selectedPdf={selectedPdf}
@@ -89,11 +89,11 @@ export default function PdfManagement() {
           </div>
 
           {/* 右侧：PDF预览和数据提取 */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 h-full">
             <PdfPreview selectedPdf={selectedPdf} />
           </div>
         </div>
       </div>
     </div>
   );
-} 
+}

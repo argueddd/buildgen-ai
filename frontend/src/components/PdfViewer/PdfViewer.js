@@ -34,20 +34,22 @@ export default function PdfViewer({ fileUrl, page }) {
   };
 
   return (
-    <div className="border rounded-xl bg-white p-4 shadow max-h-[700px] overflow-y-auto">
+    <div className="border rounded-xl bg-white p-4 shadow h-screen overflow-y-auto">
       {error ? (
         <div className="text-center py-8 text-red-500">
           <p>{error}</p>
           <p className="text-sm text-gray-500 mt-2">URL: {fileUrl}</p>
         </div>
       ) : (
-        <Document 
-          file={fileUrl} 
-          onLoadSuccess={onDocumentLoadSuccess}
-          onLoadError={onDocumentLoadError}
-        >
-          <Page pageNumber={currentPage} />
-        </Document>
+        <div className="flex justify-center">
+          <Document 
+            file={fileUrl} 
+            onLoadSuccess={onDocumentLoadSuccess}
+            onLoadError={onDocumentLoadError}
+          >
+            <Page pageNumber={currentPage} />
+          </Document>
+        </div>
       )}
       <div className="flex items-center justify-center gap-2 mt-4">
         <button

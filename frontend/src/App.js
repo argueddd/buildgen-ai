@@ -1,110 +1,174 @@
 import React, { useState, useEffect } from 'react';
 import SearchPanel from './components/SearchPanel/SearchPanel';
+import ReportEditor from './components/SearchPanel/ReportEditor';
 import PdfList from './components/PdfManager/PdfList';
 import PdfPreview from './components/PdfManager/PdfPreview';
 import axios from 'axios';
+import { 
+  LocalStorageKeys, 
+  saveToLocalStorage, 
+  getFromLocalStorage 
+} from './utils/localStorage';
 
 export default function App() {
-  const [selectedReports, setSelectedReports] = useState([]);
-  const [currentPage, setCurrentPage] = useState('search'); // 'search' 或 'pdf-management'
+  // 从localStorage恢复状态，如果没有则使用默认值
+  const [currentPage, setCurrentPage] = useState(() => 
+    getFromLocalStorage(LocalStorageKeys.CURRENT_PAGE, 'search')
+  );
+  
+  const [globalSearchResults, setGlobalSearchResults] = useState(() => 
+    getFromLocalStorage(LocalStorageKeys.SEARCH_RESULTS, [])
+  );
+  
+  const [globalSelectedReports, setGlobalSelectedReports] = useState(() => 
+    getFromLocalStorage(LocalStorageKeys.SELECTED_REPORTS, [])
+  );
+  
+  const [searchKeyword, setSearchKeyword] = useState(() => 
+    getFromLocalStorage(LocalStorageKeys.SEARCH_KEYWORD, '')
+  );
 
-  const handleSelectReport = (report) => {
-    if (!selectedReports.find(r => r.content === report.content)) {
-      setSelectedReports(prev => [...prev, report]);
-    }
-  };
+  const [selectedPdf, setSelectedPdf] = useState(() => 
+    getFromLocalStorage(LocalStorageKeys.SELECTED_PDF, null)
+  );
+  
+  const [pdfList, setPdfList] = useState(() => 
+    getFromLocalStorage(LocalStorageKeys.PDF_LIST, [])
+  );
+  
+  const [deletingPdfs, setDeletingPdfs] = useState(new Set());
+
+  // 监听状态变化并保存到localStorage
+  useEffect(() => {
+    saveToLocalStorage(LocalStorageKeys.CURRENT_PAGE, currentPage);
+  }, [currentPage]);
+
+  useEffect(() => {
+    saveToLocalStorage(LocalStorageKeys.SEARCH_RESULTS, globalSearchResults);
+  }, [globalSearchResults]);
+
+  useEffect(() => {
+    saveToLocalStorage(LocalStorageKeys.SELECTED_REPORTS, globalSelectedReports);
+  }, [globalSelectedReports]);
+
+  useEffect(() => {
+    saveToLocalStorage(LocalStorageKeys.SEARCH_KEYWORD, searchKeyword);
+  }, [searchKeyword]);
+
+  useEffect(() => {
+    saveToLocalStorage(LocalStorageKeys.SELECTED_PDF, selectedPdf);
+  }, [selectedPdf]);
+
+  useEffect(() => {
+    saveToLocalStorage(LocalStorageKeys.PDF_LIST, pdfList);
+  }, [pdfList]);
+
+  // 统一的顶部导航栏 - 移动到组件内部
+  const renderNavigation = () => (
+    <div className="bg-white shadow-sm border-b">
+      <div className="w-full px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center py-4">
+          <h1 className="text-2xl font-bold text-gray-900">AI辅助报告生成系统</h1>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setCurrentPage('search')}
+              className={`px-6 py-2 rounded-lg transition ${
+                currentPage === 'search'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              检索文档
+            </button>
+            <button
+              onClick={() => setCurrentPage('report-editor')}
+              className={`px-6 py-2 rounded-lg transition ${
+                currentPage === 'report-editor'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              编辑报告
+            </button>
+            <button
+              onClick={() => setCurrentPage('pdf-management')}
+              className={`px-6 py-2 rounded-lg transition ${
+                currentPage === 'pdf-management'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              PDF管理
+            </button>
+            <button
+              onClick={() => {
+                if (window.confirm('确定要清空所有本地数据吗？这将清除所有搜索结果、聊天记录等数据。')) {
+                  // 清空localStorage
+                  Object.values(LocalStorageKeys).forEach(key => {
+                    localStorage.removeItem(key);
+                  });
+                  // 重置所有状态
+                  setCurrentPage('search');
+                  setGlobalSearchResults([]);
+                  setGlobalSelectedReports([]);
+                  setSearchKeyword('');
+                  setSelectedPdf(null);
+                  setPdfList([]);
+                  window.location.reload();
+                }
+              }}
+              className="px-4 py-2 rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition text-sm"
+            >
+              清空数据
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const renderSearchPage = () => (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white text-gray-900 px-8 py-10 font-sans">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          📄 <span>RAG 标准报告前端</span>
-        </h1>
-        <button
-          onClick={() => setCurrentPage('pdf-management')}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          📁 PDF管理
-        </button>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <SearchPanel onSelectReport={handleSelectReport} />
-
-        <div className="border border-gray-200 rounded-xl bg-white shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4 text-blue-700">✅ 已选报告</h2>
-          <ul className="space-y-3">
-            {selectedReports.map((r, i) => (
-              <li
-                key={i}
-                className="bg-blue-50 border border-blue-200 p-3 rounded-lg hover:bg-blue-100 transition flex justify-between items-center"
-              >
-                <div>
-                  <div className="text-sm font-medium">{r.title}</div>
-                  <div className="text-xs text-gray-500">章节：{r.section}</div>
-                </div>
-                <button
-                  onClick={() =>
-                    setSelectedReports(prev => prev.filter(item => item.content !== r.content))
-                  }
-                  className="text-xs text-red-500 hover:underline ml-4"
-                >
-                  删除
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
+    <div className="min-h-screen bg-gray-50">
+      {renderNavigation()}
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
+        <SearchPanel 
+          globalSearchResults={globalSearchResults}
+          setGlobalSearchResults={setGlobalSearchResults}
+          globalSelectedReports={globalSelectedReports}
+          setGlobalSelectedReports={setGlobalSelectedReports}
+          searchKeyword={searchKeyword}
+          setSearchKeyword={setSearchKeyword}
+        />
       </div>
     </div>
   );
 
-  const renderPdfManagementPage = () => (
+  const renderReportEditorPage = () => (
     <div className="min-h-screen bg-gray-50">
-      {/* 顶部导航 */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
+      {renderNavigation()}
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
+        {globalSearchResults.length > 0 ? (
+          <ReportEditor 
+            searchResults={globalSearchResults}
+            onBack={() => setCurrentPage('search')}
+          />
+        ) : (
+          <div className="bg-white rounded-lg shadow p-8">
+            <div className="text-center py-12">
+              <h2 className="text-2xl font-bold text-gray-700 mb-4">报告编辑器</h2>
+              <p className="text-gray-500 mb-6">请先进行文档检索，然后点击"编辑报告"按钮进入编辑界面</p>
               <button
                 onClick={() => setCurrentPage('search')}
-                className="px-3 py-1 text-gray-600 hover:text-gray-900 transition"
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
-                ← 返回搜索
+                前往检索页面
               </button>
-              <h1 className="text-2xl font-bold text-gray-900">AI辅助报告生成系统</h1>
             </div>
-            <div className="text-sm text-gray-500">PDF管理与数据提取</div>
           </div>
-        </div>
-      </div>
-
-      {/* 主内容区域 */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 左侧：PDF列表 */}
-          <div className="lg:col-span-1">
-            <PdfList
-              pdfList={pdfList}
-              selectedPdf={selectedPdf}
-              onPdfSelect={handlePdfSelect}
-              onPdfUpload={handlePdfUpload}
-              onPdfDelete={handlePdfDelete}
-            />
-          </div>
-
-          {/* 右侧：PDF预览和数据提取 */}
-          <div className="lg:col-span-2">
-            <PdfPreview selectedPdf={selectedPdf} />
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
-
-  // PDF管理页面的状态
-  const [selectedPdf, setSelectedPdf] = useState(null);
-  const [pdfList, setPdfList] = useState([]);
 
   const handlePdfSelect = (pdf) => {
     setSelectedPdf(pdf);
@@ -120,18 +184,75 @@ export default function App() {
     }
   };
 
-  const handlePdfDelete = (pdfId) => {
-    setPdfList(prev => prev.filter(pdf => pdf.id !== pdfId));
-    if (selectedPdf && selectedPdf.id === pdfId) {
-      setSelectedPdf(null);
+  const handlePdfDelete = async (pdfId) => {
+    try {
+      // 确认删除
+      const confirmed = window.confirm('确定要删除这个PDF文件吗？此操作将删除文件及所有相关数据，且无法恢复。');
+      if (!confirmed) {
+        return;
+      }
+  
+      // 添加到删除中状态
+      setDeletingPdfs(prev => new Set([...prev, pdfId]));
+  
+      // 调用后端删除API
+      const response = await axios.delete(`http://aireportbackend.s7.tunnelfrp.com/delete-pdf/${pdfId}`);
+      
+      if (response.data.success) {
+        // 从前端状态中删除
+        setPdfList(prev => prev.filter(pdf => pdf.id !== pdfId));
+        if (selectedPdf && selectedPdf.id === pdfId) {
+          setSelectedPdf(null);
+        }
+        alert('PDF文件删除成功！');
+      } else {
+        alert('删除失败：' + response.data.error);
+      }
+    } catch (error) {
+      console.error('删除PDF失败:', error);
+      alert('删除失败：' + (error.response?.data?.error || error.message));
+    } finally {
+      // 从删除中状态移除
+      setDeletingPdfs(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(pdfId);
+        return newSet;
+      });
     }
   };
+
+  const renderPdfManagementPage = () => (
+    <div className="min-h-screen bg-gray-50">
+      {renderNavigation()}
+      {/* 主内容区域 */}
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* 左侧：PDF列表 */}
+          <div className="lg:col-span-1">
+            <PdfList
+              pdfList={pdfList}
+              selectedPdf={selectedPdf}
+              onPdfSelect={handlePdfSelect}
+              onPdfUpload={handlePdfUpload}
+              onPdfDelete={handlePdfDelete}
+              deletingPdfs={deletingPdfs}
+            />
+          </div>
+
+          {/* 右侧：PDF预览和数据提取 */}
+          <div className="lg:col-span-2">
+            <PdfPreview selectedPdf={selectedPdf} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   // 初始化时从后端获取PDF列表
   useEffect(() => {
     const fetchPdfList = async () => {
       try {
-        const response = await axios.get('http://localhost:8010/pdf-list');
+        const response = await axios.get('http://aireportbackend.s7.tunnelfrp.com/pdf-list');
         if (response.data.pdfs) {
           setPdfList(response.data.pdfs);
         }
@@ -143,5 +264,19 @@ export default function App() {
     fetchPdfList();
   }, []);
 
-  return currentPage === 'search' ? renderSearchPage() : renderPdfManagementPage();
+  // 根据当前页面渲染对应内容
+  const renderCurrentPage = () => {
+    switch (currentPage) {
+      case 'search':
+        return renderSearchPage();
+      case 'report-editor':
+        return renderReportEditorPage();
+      case 'pdf-management':
+        return renderPdfManagementPage();
+      default:
+        return renderSearchPage();
+    }
+  };
+
+  return renderCurrentPage();
 }

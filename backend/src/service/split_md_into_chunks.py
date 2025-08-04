@@ -1,5 +1,13 @@
+import json
+import os
 import re
+import uuid
+from datetime import datetime
 from typing import List, Dict
+
+from tqdm import tqdm
+
+
 
 
 class MarkdownSectionClassifier:
@@ -141,20 +149,85 @@ def match_explanation_pairs(chunks: List[Dict]) -> List[Dict]:
     result = []
     for section, roles in section_map.items():
         if "正文" in roles or "条文说明" in roles:
+            # 获取标题，优先使用正文的标题
+            title = ""
+            if "正文" in roles:
+                title = roles["正文"]["title"]
+            elif "条文说明" in roles:
+                title = roles["条文说明"]["title"]
+            
             result.append({
                 "section": section,
-                "title": roles.get("正文", roles.get("条文说明"))["title"],
-                "正文": roles.get("正文"),
-                "条文说明": roles.get("条文说明")
+                "title": title,
+                "正文": roles.get("正文", {}).get("content", ""),  # 返回content字段的文本内容
+                "条文说明": roles.get("条文说明", {}).get("content", "")  # 返回content字段的文本内容
             })
     return result
 
 # 示例使用
 if __name__ == "__main__":
-    with open("./data/output/JGJ289-2012_建筑外墙外保温防火隔离带技术规程/auto/JGJ289-2012_建筑外墙外保温防火隔离带技术规程.md", "r", encoding="utf-8") as f:
-        md_text = f.read()
+    from backend.app import update_processing_status, save_chunks_to_milvus
+    from backend.src.service.question_generator import generate_questions_for_chunk
+    output_dir = "data/output"
 
-    mdc = MarkdownChunker(md_text)
-    chunks = mdc.run()
-    match_result = match_explanation_pairs(chunks)
-    pass
+    # 获取所有子文件夹
+    folder_names = [name for name in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, name))]
+
+    # tqdm 包装子文件夹遍历
+    for source_name in tqdm(folder_names, desc="Processing source folders", ncols=100):
+        filename = source_name+".pdf"
+
+        path = f"./data/output/{source_name}/auto/{source_name}.md"
+        file_id = str(uuid.uuid4())
+        with open(path, "r", encoding="utf-8") as f:
+            md_content = f.read()
+
+        mdc = MarkdownChunker(md_content)
+        chunks = mdc.run()
+
+        # 为每个chunk生成问题和tags
+        print("为chunks生成问题和tags...")
+        for i, chunk in enumerate(chunks):
+            try:
+                print(f"处理chunk {i + 1}/{len(chunks)}...")
+                # 生成问题
+                questions_tag_dict = generate_questions_for_chunk(chunk)
+                print(f"生成结果: {questions_tag_dict}")
+                # 将问题和tags添加到chunk中
+                chunk.update(questions_tag_dict)
+            except Exception as e:
+                print(f"为chunk {i + 1}生成问题失败: {e}")
+                # 如果生成失败，添加空的tags
+                chunk.update({
+                    'question1': '',
+                    'question2': '',
+                    'question3': '',
+                    'tags': ''
+                })
+
+        update_processing_status(file_id, 'processing', f'存储到数据库 ({len(chunks)} chunks)...', 5, 5)
+        print(f"开始存储 {len(chunks)} 个chunks到Milvus...")
+        save_chunks_to_milvus(chunks, filename, "specs_architecture_v1")
+
+        # 完成: 更新处理信息为完成状态
+        processed_info = {
+            'id': file_id,
+            'original_name': filename,
+            'filename': filename,
+            'upload_date': datetime.now().isoformat(),
+            'file_size': os.path.getsize(path),
+            'chunks_count': len(chunks),
+            'status': 'completed',
+            'md_content': md_content,
+            'chunks': chunks,
+            'processing_steps': {
+                'current_step': 5,
+                'total_steps': 5,
+                'description': '处理完成'
+            }
+        }
+
+        # 保存完成信息
+        info_file = os.path.join("./processed_pdfs", f"{file_id}.json")
+        with open(info_file, 'w', encoding='utf-8') as f:
+            json.dump(processed_info, f, ensure_ascii=False, indent=2)

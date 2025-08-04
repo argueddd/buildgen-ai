@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PdfUpload from './PdfUpload';
 import axios from 'axios';
+import { commonStyles } from '../../styles/commonStyles';
 
-export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload, onPdfDelete }) {
+export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload, onPdfDelete, deletingPdfs }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showUpload, setShowUpload] = useState(false);
@@ -10,25 +11,27 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
               const [processingPdfs, setProcessingPdfs] = useState(new Set());
 
   // 获取PDF列表
-  const fetchPdfList = async () => {
+  // 将 fetchPdfList 函数用 useCallback 包装以避免依赖警告
+  const fetchPdfList = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:8010/pdf-list');
-      if (response.data.pdfs) {
-        // 更新父组件的pdfList
-        onPdfUpload({ type: 'refresh', pdfs: response.data.pdfs });
-      }
+      const response = await axios.get('http://aireportbackend.s7.tunnelfrp.com/pdf-list');
+      const pdfsWithStatus = response.data.map(pdf => ({
+        ...pdf,
+        status: processingPdfs.has(pdf.id) ? 'processing' : (pdf.status || 'completed')
+      }));
+      onPdfUpload(pdfsWithStatus);
     } catch (error) {
       console.error('获取PDF列表失败:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [onPdfUpload, processingPdfs]);
 
   // 组件加载时获取PDF列表
   useEffect(() => {
     fetchPdfList();
-  }, []);
+  }, [fetchPdfList]);
 
   // 检查正在处理的PDF状态
   useEffect(() => {
@@ -38,7 +41,7 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
 
       for (const fileId of processingIds) {
         try {
-          const response = await axios.get(`http://localhost:8010/processed/${fileId}`);
+          const response = await axios.get(`http://aireportbackend.s7.tunnelfrp.com/processed/${fileId}`);
           if (response.data.status === 'completed' || response.data.status === 'failed') {
             // 处理完成，从处理列表中移除
             setProcessingPdfs(prev => {
@@ -57,7 +60,7 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
 
     const interval = setInterval(checkProcessingStatus, 3000); // 每3秒检查一次
     return () => clearInterval(interval);
-  }, [processingPdfs]);
+  }, [processingPdfs, fetchPdfList]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -99,23 +102,33 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
     return matchesSearch && matchesStatus;
   });
 
-  const handleUploadSuccess = (newPdf) => {
-    onPdfUpload(newPdf);
-    // 上传成功后刷新列表
-    fetchPdfList();
-    
-    // 如果是上传中状态，添加到处理列表
-    if (newPdf.status === 'uploading') {
-      setProcessingPdfs(prev => new Set([...prev, newPdf.id]));
+  const handleUploadSuccess = (result) => {
+    if (result.type === 'batch') {
+      // 批量上传结果
+      result.pdfs.forEach(pdf => {
+        onPdfUpload(pdf);
+        if (pdf.status === 'uploading') {
+          setProcessingPdfs(prev => new Set([...prev, pdf.id]));
+        }
+      });
+    } else {
+      // 单文件上传结果
+      onPdfUpload(result);
+      if (result.status === 'uploading') {
+        setProcessingPdfs(prev => new Set([...prev, result.id]));
+      }
     }
+    
+    // 刷新列表
+    fetchPdfList();
   };
 
   return (
-    <div className="bg-white rounded-lg shadow">
+    <div className="bg-white rounded-lg shadow h-full flex flex-col">
       {/* 头部操作区 */}
-      <div className="p-4 border-b">
+      <div className="p-4 border-b flex-shrink-0">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">PDF文档列表</h2>
+          <h2 className={commonStyles.secondaryTitle}>PDF文档列表</h2>
           <div className="flex space-x-2">
             <button
               onClick={fetchPdfList}
@@ -156,7 +169,7 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
       </div>
 
       {/* PDF列表 */}
-      <div className="p-4">
+      <div className="flex-1 p-4 overflow-y-auto min-h-0 max-h-screen">
         {loading ? (
           <div className="text-center py-8">
             <div className="w-8 h-8 mx-auto border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
@@ -164,69 +177,79 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredPdfList.map((pdf) => (
-              <div
-                key={pdf.id}
-                className={`p-3 border rounded-lg cursor-pointer transition ${
-                  selectedPdf?.id === pdf.id
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-                onClick={() => onPdfSelect(pdf)}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-900 truncate">
-                      {pdf.name}
-                    </h3>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span className="text-xs text-gray-500">{pdf.date}</span>
-                      <span className="text-xs text-gray-500">•</span>
-                      <span className="text-xs text-gray-500">{pdf.size}</span>
-                      {pdf.chunksCount && (
-                        <>
-                          <span className="text-xs text-gray-500">•</span>
-                          <span className="text-xs text-blue-600">{pdf.chunksCount} chunks</span>
-                        </>
-                      )}
-                    </div>
-                    <div className="mt-2">
-                      <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(pdf.status)}`}>
-                        {pdf.status === 'uploading' && (
-                          <div className="w-3 h-3 mr-1 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+            {filteredPdfList.map((pdf) => {
+              const isDeleting = deletingPdfs?.has(pdf.id); // 检查是否正在删除
+              
+              return (
+                <div
+                  key={pdf.id}
+                  className={`p-3 border rounded-lg cursor-pointer transition ${
+                    selectedPdf?.id === pdf.id
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                  } ${isDeleting ? 'opacity-50' : ''}`} // 删除时降低透明度
+                  onClick={() => !isDeleting && onPdfSelect(pdf)} // 删除时禁用点击
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-gray-900 truncate">
+                        {pdf.name}
+                      </h3>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <span className="text-xs text-gray-500">{pdf.date}</span>
+                        <span className="text-xs text-gray-500">•</span>
+                        <span className="text-xs text-gray-500">{pdf.size}</span>
+                        {pdf.chunksCount && (
+                          <>
+                            <span className="text-xs text-gray-500">•</span>
+                            <span className="text-xs text-blue-600">{pdf.chunksCount} chunks</span>
+                          </>
                         )}
-                        {getStatusText(pdf.status)}
-                      </span>
-                      {pdf.processing_steps && (pdf.status === 'uploading' || pdf.status === 'processing') && (
-                        <div className="mt-1 text-xs text-gray-600">
-                          <div className="flex items-center justify-between">
-                            <span>{pdf.processing_steps.description}</span>
-                            <span>{pdf.processing_steps.current_step}/{pdf.processing_steps.total_steps}</span>
+                      </div>
+                      <div className="mt-2">
+                        <span className={`inline-flex items-center px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(pdf.status)}`}>
+                          {(pdf.status === 'uploading' || isDeleting) && (
+                            <div className="w-3 h-3 mr-1 border-2 border-current border-t-transparent rounded-full animate-spin"></div>
+                          )}
+                          {isDeleting ? '删除中...' : getStatusText(pdf.status)}
+                        </span>
+                        {pdf.processing_steps && (pdf.status === 'uploading' || pdf.status === 'processing') && (
+                          <div className="mt-1 text-xs text-gray-600">
+                            <div className="flex items-center justify-between">
+                              <span>{pdf.processing_steps.description}</span>
+                              <span>{pdf.processing_steps.current_step}/{pdf.processing_steps.total_steps}</span>
+                            </div>
+                            <div className="mt-1 w-full bg-gray-200 rounded-full h-1">
+                              <div 
+                                className="bg-blue-600 h-1 rounded-full transition-all duration-300"
+                                style={{ width: `${(pdf.processing_steps.current_step / pdf.processing_steps.total_steps) * 100}%` }}
+                              ></div>
+                            </div>
                           </div>
-                          <div className="mt-1 w-full bg-gray-200 rounded-full h-1">
-                            <div 
-                              className="bg-blue-600 h-1 rounded-full transition-all duration-300"
-                              style={{ width: `${(pdf.processing_steps.current_step / pdf.processing_steps.total_steps) * 100}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
+                    {isDeleting ? (
+                      // 删除中显示加载圆圈
+                      <div className="ml-2 w-4 h-4 border-2 border-red-300 border-t-red-600 rounded-full animate-spin"></div>
+                    ) : (
+                      // 正常显示删除按钮
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onPdfDelete(pdf.id);
+                        }}
+                        className="ml-2 text-gray-400 hover:text-red-500 transition"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onPdfDelete(pdf.id);
-                    }}
-                    className="ml-2 text-gray-400 hover:text-red-500 transition"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -246,4 +269,4 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
       )}
     </div>
   );
-} 
+}

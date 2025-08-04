@@ -1,10 +1,11 @@
+
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 from backend.src.infrastructure.milvus_db import MilvusDbManager
 
-manager = MilvusDbManager(collection_name="specs_architecture")
-results = manager.search("非潮湿环境做保温层", limit=3)
+manager = MilvusDbManager(collection_name="specs_architecture_v1")
+results = manager.search("木头保温杯", limit=5)
 
-for res in results:
-    print(f"[内容] {res['content']}")
-    print(f"[标签] {res['tags']}")
-    print(f"[分数] {res['score']:.4f}")
-    print("-" * 40)
+
+print(f"[搜索结果] {len(results)} 条")

@@ -1,6 +1,9 @@
 import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 from pymilvus import MilvusClient, DataType, connections, Collection
 from sentence_transformers import SentenceTransformer
+from backend.src.service.keyword_generator import generate_keyword_for_query
 
 DEFAULT_QWEN_DIM = 1024
 MILVUS_HOST = os.getenv("MILVUS_HOST", "localhost")
@@ -15,8 +18,18 @@ def _deduplicate_and_rank_results(results, limit):
     return sorted(content_map.values(), key=lambda x: x["score"], reverse=True)[:limit]
 
 
+def _deduplicate_by_id_and_rank_results(results, limit):
+    """按照id去重并排序结果"""
+    id_map = {}
+    for r in results:
+        key = r["id"]
+        if key not in id_map or r["score"] > id_map[key]["score"]:
+            id_map[key] = r
+    return sorted(id_map.values(), key=lambda x: x["score"], reverse=True)
+
+
 class EmbeddingModelWrapper:
-    def __init__(self, model_name="Qwen/Qwen3-Embedding-0.6B", device="mps", dim=DEFAULT_QWEN_DIM):
+    def __init__(self, model_name="./models/Qwen3-Embedding-0.6B", device="cpu", dim=DEFAULT_QWEN_DIM):
         self.model = SentenceTransformer(model_name, device=device)
         self.dim = dim
 
@@ -97,42 +110,85 @@ class MilvusDbManager:
         self.client.insert(collection_name=self.collection_name, data=data)
 
     def search(self, query_text, limit=10):
+        # 首先使用关键词扩展
+        try:
+            expanded_keywords = generate_keyword_for_query(query=query_text)
+            print(f"关键词扩展结果: {expanded_keywords}")
+        except Exception as e:
+            print(f"关键词扩展失败，使用原始查询: {e}")
+            expanded_keywords = {}
+        
+        # 收集所有扩展的关键词
+        all_keywords = [query_text]  # 包含原始查询
+        
+        if expanded_keywords:
+            for keyword_type, keywords in expanded_keywords.items():
+                if isinstance(keywords, list):
+                    all_keywords.extend(keywords)
+        
+        print(f"总共查询关键词数量: {len(all_keywords)}")
+        
         connections.connect(host=MILVUS_HOST)
         Collection(name=self.collection_name).load()
-        query_vector = self.encoder.encode(query_text, label="query")
-
+        
         all_results = []
+        # 在search方法中修改output_fields
         output_fields = [
             "content", "title", "section", "tags",
-            "question1", "question2", "source_file"
+            "question1", "question2", "source_file",
+            "text_role"  # 添加text_role字段
         ]
+        
+        # 遍历所有关键词进行查询
+        for keyword in all_keywords:
+            if not keyword or not keyword.strip():
+                continue
+                
+            query_vector = self.encoder.encode(keyword, label=f"keyword: {keyword}")
+            
+            for field, weight in zip([
+                "tags_vector",
+                "question1_vector", "question2_vector",
+                "content_vector"
+            ], [1.8, 1.2, 1.0, 1.5]):
+                raw = Collection(self.collection_name).search(
+                    data=[query_vector], anns_field=field,
+                    param={"metric_type": "COSINE", "params": {"ef": 128}},
+                    limit=limit, output_fields=output_fields
+                )
+                for hits in raw:
+                    for hit in hits:
+                        all_results.append({
+                            "id": hit.entity.get("id"),
+                            "content": hit.entity.get("content"),
+                            "title": hit.entity.get("title"),
+                            "section": hit.entity.get("section"),
+                            "tag": hit.entity.get("tags"),
+                            "question1": hit.entity.get("question1"),
+                            "question2": hit.entity.get("question2"),
+                            "source_file": hit.entity.get("source_file"),
+                            "field": field,
+                            "page_num": 5,
+                            "score": hit.distance * weight,
+                            "matched_keyword": keyword,
+                            "text_role": hit.entity.get("text_role") # 记录匹配的关键词
+                        })
+        
+        # 按照id去重并排序
+        return _deduplicate_by_id_and_rank_results(all_results, limit=limit)
 
-        for field, weight in zip([
-            "tags_vector",
-            "question1_vector", "question2_vector",
-            "content_vector"
-        ], [1.8, 1.2, 1.0, 1.5]):
-            raw = Collection(self.collection_name).search(
-                data=[query_vector], anns_field=field,
-                param={"metric_type": "COSINE", "params": {"ef": 128}},
-                limit=limit, output_fields=output_fields
-            )
-            for hits in raw:
-                for hit in hits:
-                    all_results.append({
-                        "content": hit.entity.get("content"),
-                        "title": hit.entity.get("title"),
-                        "section": hit.entity.get("section"),
-                        "tag": hit.entity.get("tags"),
-                        "question1": hit.entity.get("question1"),
-                        "question2": hit.entity.get("question2"),
-                        "source_file": hit.entity.get("source_file"),
-                        "field": field,
-                        "page_num": 5,
-                        "score": hit.distance * weight
-                    })
-
-        return _deduplicate_and_rank_results(all_results, limit=limit)
+    def delete_by_expr(self, expr):
+        """根据表达式删除数据"""
+        try:
+            connections.connect(host=MILVUS_HOST)
+            collection = Collection(self.collection_name)
+            collection.delete(expr)
+            collection.flush()
+            print(f"已删除数据: {expr}")
+            return True
+        except Exception as e:
+            print(f"删除数据失败: {e}")
+            return False
 
     def delete_collection(self):
         connections.connect(host=MILVUS_HOST)
