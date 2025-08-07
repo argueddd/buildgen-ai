@@ -3,9 +3,7 @@ import json
 import requests
 from openai import OpenAI
 
-from backend.src.utils.llm_utils import get_llm_config, collect_stream, load_template_and_fill
-
-API_KEY, BASE_URL, MODEL_TYPE = get_llm_config()
+from backend.src.utils.llm_utils import get_current_model_config, collect_stream, load_template_and_fill
 
 
 def revoke_llm_deployment_by_vllm(message, base_url, model_path, incremental=True):
@@ -125,15 +123,22 @@ class RagLLMAPI(LLM_API):
 
 class LLMAPIFactory:
     @staticmethod
-    def create_api(situation='rag'):
+    def create_api(situation='rag', model_name=None):
+        print(f"active model is {model_name}")
+        api_key, base_url, model_type = get_current_model_config(model_name)
+        print(f"model is {model_type}, base_url is {base_url}")
+        if not all([api_key, base_url, model_type]):
+            raise ValueError('LLM配置不完整，请检查配置文件')
+        
         if situation == 'rag':
-            return RagLLMAPI(api_key=API_KEY, base_url=BASE_URL, model_type=MODEL_TYPE)
+            return RagLLMAPI(api_key=api_key, base_url=base_url, model_type=model_type)
         else:
             raise ValueError(f'situation {situation} not supported')
 
 
 if __name__ == '__main__':
-    print(f"model is {MODEL_TYPE}, base_url is {BASE_URL}")
+    api_key, base_url, model_type = get_current_model_config()
+    print(f"model is {model_type}, base_url is {base_url}")
     retrial_llm = LLMAPIFactory.create_api()
     generate_question_prompt = load_template_and_fill(
         template_path="prompt/generate_content_related_questions.tmpl",

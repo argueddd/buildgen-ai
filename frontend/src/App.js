@@ -3,12 +3,15 @@ import SearchPanel from './components/SearchPanel/SearchPanel';
 import ReportEditor from './components/SearchPanel/ReportEditor';
 import PdfList from './components/PdfManager/PdfList';
 import PdfPreview from './components/PdfManager/PdfPreview';
+import SettingsPage from './components/Settings/SettingsPage';
 import axios from 'axios';
 import { 
   LocalStorageKeys, 
   saveToLocalStorage, 
   getFromLocalStorage 
 } from './utils/localStorage';
+import { buildApiUrl, API_ENDPOINTS } from './config/apiConfig';
+import { configApi } from './config/apiService';
 
 export default function App() {
   // 从localStorage恢复状态，如果没有则使用默认值
@@ -99,6 +102,16 @@ export default function App() {
               }`}
             >
               PDF管理
+            </button>
+            <button
+              onClick={() => setCurrentPage('settings')}
+              className={`px-6 py-2 rounded-lg transition ${
+                currentPage === 'settings'
+                  ? 'bg-orange-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              系统设置
             </button>
             <button
               onClick={() => {
@@ -196,7 +209,7 @@ export default function App() {
       setDeletingPdfs(prev => new Set([...prev, pdfId]));
   
       // 调用后端删除API
-      const response = await axios.delete(`http://aireportbackend.s7.tunnelfrp.com/delete-pdf/${pdfId}`);
+      const response = await axios.delete(buildApiUrl(API_ENDPOINTS.PDF.DELETE(pdfId)));
       
       if (response.data.success) {
         // 从前端状态中删除
@@ -248,11 +261,22 @@ export default function App() {
     </div>
   );
 
-  // 初始化时从后端获取PDF列表
+  const renderSettingsPage = () => (
+    <div className="min-h-screen bg-gray-50">
+      {renderNavigation()}
+      <div className="w-full px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-4xl mx-auto">
+          <SettingsPage />
+        </div>
+      </div>
+    </div>
+  );
+
+  // 初始化时从后端获取PDF列表和模型配置
   useEffect(() => {
     const fetchPdfList = async () => {
       try {
-        const response = await axios.get('http://aireportbackend.s7.tunnelfrp.com/pdf-list');
+        const response = await axios.get(buildApiUrl(API_ENDPOINTS.PDF.LIST));
         if (response.data.pdfs) {
           setPdfList(response.data.pdfs);
         }
@@ -261,7 +285,20 @@ export default function App() {
       }
     };
 
+    const fetchConfig = async () => {
+      try {
+        const response = await configApi.getConfig();
+        if (response.data.success) {
+          console.log('模型配置已加载:', response.data);
+          // 这里可以根据需要处理配置数据，比如设置全局状态
+        }
+      } catch (error) {
+        console.error('获取模型配置失败:', error);
+      }
+    };
+
     fetchPdfList();
+    fetchConfig();
   }, []);
 
   // 根据当前页面渲染对应内容
@@ -273,6 +310,8 @@ export default function App() {
         return renderReportEditorPage();
       case 'pdf-management':
         return renderPdfManagementPage();
+      case 'settings':
+        return renderSettingsPage();
       default:
         return renderSearchPage();
     }

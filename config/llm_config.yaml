@@ -1,9 +1,16 @@
-LLM:
-  QWEN:
-    BASE_URL: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    MODEL_TYPE: "qwen-turbo"
-    API_KEY: "sk-dcc3b05091194b2e80d302fc0f58e82e"
-  YI:
-    BASE_URL: "https://api.lingyiwanwu.com/v1"
-    MODEL_TYPE: "yi-lightning"
-    API_KEY: "6f81e788d6644165b518c8031c46e22c"
+'1111':
+  API_KEY: '1111'
+  BASE_URL: '111'
+  MODEL_TYPE: '1111'
+qwen-turbo:
+  API_KEY: sk-dcc3b05091194b2e80d302fc0f58e82e
+  BASE_URL: https://dashscope.aliyuncs.com/compatible-mode/v1
+  MODEL_TYPE: qwen-turbo
+yi-large:
+  API_KEY: sk-dcc3b05091194b2e80d302fc0f58e82e
+  BASE_URL: https://dashscope.aliyuncs.com/compatible-mode/v2
+  MODEL_TYPE: yi-large
+zzz:
+  API_KEY: zzzz
+  BASE_URL: zzz
+  MODEL_TYPE: zzz

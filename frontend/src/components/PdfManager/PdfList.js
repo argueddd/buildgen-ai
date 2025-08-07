@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import PdfUpload from './PdfUpload';
 import axios from 'axios';
 import { commonStyles } from '../../styles/commonStyles';
+import { buildApiUrl, API_ENDPOINTS } from '../../config/apiConfig';
 
 export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload, onPdfDelete, deletingPdfs }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,7 +16,7 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
   const fetchPdfList = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://aireportbackend.s7.tunnelfrp.com/pdf-list');
+      const response = await axios.get(buildApiUrl(API_ENDPOINTS.PDF.LIST));
       const pdfsWithStatus = response.data.map(pdf => ({
         ...pdf,
         status: processingPdfs.has(pdf.id) ? 'processing' : (pdf.status || 'completed')
@@ -41,7 +42,7 @@ export default function PdfList({ pdfList, selectedPdf, onPdfSelect, onPdfUpload
 
       for (const fileId of processingIds) {
         try {
-          const response = await axios.get(`http://aireportbackend.s7.tunnelfrp.com/processed/${fileId}`);
+          const response = await axios.get(buildApiUrl(API_ENDPOINTS.PDF.PROCESSED(fileId)));
           if (response.data.status === 'completed' || response.data.status === 'failed') {
             // 处理完成，从处理列表中移除
             setProcessingPdfs(prev => {

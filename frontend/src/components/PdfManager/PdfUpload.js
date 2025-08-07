@@ -1,11 +1,10 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
+import { buildApiUrl, buildUploadUrl, API_ENDPOINTS } from '../../config/apiConfig';
 
 export default function PdfUpload({ onClose, onUpload }) {
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadMode, setUploadMode] = useState('single'); // 'single', 'multiple', 'folder'
-  const [fileList, setFileList] = useState([]);
   const [uploadProgress, setUploadProgress] = useState({});
   const [uploadStatus, setUploadStatus] = useState('');
   const fileInputRef = useRef(null);
@@ -65,7 +64,6 @@ export default function PdfUpload({ onClose, onUpload }) {
       return;
     }
 
-    setFileList(validFiles);
     setUploading(true);
     setUploadStatus(`准备上传 ${validFiles.length} 个文件...`);
 
@@ -109,7 +107,7 @@ export default function PdfUpload({ onClose, onUpload }) {
       },
     };
 
-    const response = await axios.post('http://aireportbackend.s7.tunnelfrp.com/upload-pdf', formData, config);
+    const response = await axios.post(buildApiUrl(API_ENDPOINTS.PDF.UPLOAD_SINGLE), formData, config);
     
     if (response.data.success) {
       setUploadProgress(prev => ({
@@ -123,7 +121,7 @@ export default function PdfUpload({ onClose, onUpload }) {
         date: new Date().toISOString().split('T')[0],
         size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
         status: response.data.status || 'uploading',
-        fileUrl: `http://aireportbackend.s7.tunnelfrp.com/uploads/${file.name}`,
+        fileUrl: buildUploadUrl(file.name),
         chunksCount: 0
       };
 
@@ -145,7 +143,7 @@ export default function PdfUpload({ onClose, onUpload }) {
 
     try {
       setUploadStatus('批量上传中...');
-      const response = await axios.post('http://aireportbackend.s7.tunnelfrp.com/upload-pdfs-batch', formData, {
+      const response = await axios.post(buildApiUrl(API_ENDPOINTS.PDF.UPLOAD_BATCH), formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
@@ -179,7 +177,7 @@ export default function PdfUpload({ onClose, onUpload }) {
             date: new Date().toISOString().split('T')[0],
             size: `${(files[index].size / 1024 / 1024).toFixed(1)} MB`,
             status: result.status || 'uploading',
-            fileUrl: `http://aireportbackend.s7.tunnelfrp.com/uploads/${files[index].name}`,
+            fileUrl: buildUploadUrl(files[index].name),
             chunksCount: 0
           }));
 
@@ -198,7 +196,6 @@ export default function PdfUpload({ onClose, onUpload }) {
   };
 
   const onSingleFileClick = () => {
-    setUploadMode('single');
     fileInputRef.current.value = '';
     fileInputRef.current.removeAttribute('multiple');
     fileInputRef.current.removeAttribute('webkitdirectory');
@@ -206,7 +203,6 @@ export default function PdfUpload({ onClose, onUpload }) {
   };
 
   const onMultipleFilesClick = () => {
-    setUploadMode('multiple');
     fileInputRef.current.value = '';
     fileInputRef.current.setAttribute('multiple', true);
     fileInputRef.current.removeAttribute('webkitdirectory');
@@ -214,7 +210,6 @@ export default function PdfUpload({ onClose, onUpload }) {
   };
 
   const onFolderClick = () => {
-    setUploadMode('folder');
     folderInputRef.current.value = '';
     folderInputRef.current.click();
   };

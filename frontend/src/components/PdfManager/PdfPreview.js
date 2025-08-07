@@ -6,10 +6,10 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
+import { buildApiUrl, API_ENDPOINTS, API_BASE_URL } from '../../config/apiConfig';
 
 // 常量配置
 const CHUNKS_PER_PAGE = 3;
-const API_BASE_URL = 'http://aireportbackend.s7.tunnelfrp.com';
 
 // 标签页配置
 const TABS = {
@@ -325,7 +325,7 @@ export default function PdfPreview({ selectedPdf }) {
   const fetchMarkdownContent = async (fileId) => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE_URL}/processed/${fileId}/markdown`);
+      const response = await axios.get(buildApiUrl(API_ENDPOINTS.PDF.PROCESSED_MARKDOWN(fileId)));
       setMarkdownContent(response.data.markdown || '');
     } catch (error) {
       console.error('获取Markdown内容失败:', error);
@@ -337,7 +337,7 @@ export default function PdfPreview({ selectedPdf }) {
 
   const fetchChunksData = async (fileId) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/processed/${fileId}`);
+      const response = await axios.get(buildApiUrl(API_ENDPOINTS.PDF.PROCESSED(fileId)));
       setChunksData(response.data.chunks || []);
     } catch (error) {
       console.error('获取chunks数据失败:', error);

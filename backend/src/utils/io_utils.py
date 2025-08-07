@@ -1,4 +1,4 @@
-from backend.src.service.split_md_into_chunks import split_markdown_with_parent_titles
+from src.service.split_md_into_chunks import split_markdown_with_parent_titles
 
 
 def load_markdown_chunks(source_name):

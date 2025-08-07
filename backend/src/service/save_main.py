@@ -1,14 +1,14 @@
 import os
 from tqdm import tqdm
-from backend.src.infrastructure.milvus_db import MilvusDbManager
-from backend.src.service.question_generator import generate_questions_for_chunk
-from backend.src.utils.io_utils import load_markdown_chunks
-from backend.src.utils.vector_utils import prepare_chunk_for_insert
+from src.infrastructure.milvus_db import MilvusDbManager
+from src.service.question_generator import generate_questions_for_chunk
+from src.utils.io_utils import load_markdown_chunks
+from src.utils.vector_utils import prepare_chunk_for_insert
 
 if __name__ == '__main__':
     output_dir = "data/output"
 
-    # 获取所有子文件夹
+    # 获取所有子文件
     folder_names = [name for name in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, name))]
 
     # tqdm 包装子文件夹遍历

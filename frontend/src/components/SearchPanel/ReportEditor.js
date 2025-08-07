@@ -10,6 +10,7 @@ import {
   saveToLocalStorage, 
   getFromLocalStorage 
 } from '../../utils/localStorage';
+import { buildApiUrl, API_ENDPOINTS } from '../../config/apiConfig';
 
 export default function ReportEditor({ searchResults, onBack }) {
   const [selectedPdf, setSelectedPdf] = useState(null);
@@ -119,8 +120,12 @@ export default function ReportEditor({ searchResults, onBack }) {
     }
   }, [isDragging, isResizing, dragStart, chatModalPosition, chatModalSize]);
 
-  // 获取所有PDF名称
-  const pdfNames = [...new Set(searchResults.map(result => result.source_file))];
+  // 获取所有PDF名称，只显示包含"正文"内容的PDF
+  const pdfNames = [...new Set(
+    searchResults
+      .filter(result => result.text_role === "正文") // 只考虑正文内容
+      .map(result => result.source_file)
+  )];
 
   // 根据选中的PDF过滤结果，并且只显示text_role为"正文"的内容
   const filteredResults = selectedPdf 
@@ -239,7 +244,7 @@ export default function ReportEditor({ searchResults, onBack }) {
     // 在 handleSendMessage 函数中，大约第182-190行
     try {
     // 使用流式接口
-    const response = await fetch('http://aireportbackend.s7.tunnelfrp.com/chat/stream', {
+    const response = await fetch(buildApiUrl(API_ENDPOINTS.CHAT.STREAM), {
     method: 'POST',
     headers: {
     'Content-Type': 'application/json',
@@ -396,7 +401,7 @@ export default function ReportEditor({ searchResults, onBack }) {
       // 直接使用source_file作为参数，后端会匹配JSON中的filename字段
       const encodedSourceFile = encodeURIComponent(sourceFile);
       
-      const response = await fetch(`http://aireportbackend.s7.tunnelfrp.com/explanations/${encodedSourceFile}`);
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.SEARCH.EXPLANATIONS(encodedSourceFile)));
       const data = await response.json();
       
       if (response.ok) {
@@ -498,16 +503,19 @@ export default function ReportEditor({ searchResults, onBack }) {
         {/* 右侧内容展示区域 - 按PDF分组显示 */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="w-full space-y-8">
-            {Object.entries(groupedContents).map(([pdfName, items]) => (
-              <div key={pdfName} className="space-y-4">
-                {/* PDF分组标题 - 添加ref用于定位 */}
-                <div 
-                  ref={el => pdfRefs.current[pdfName] = el}
-                  className="bg-blue-50 border border-blue-200 rounded-lg p-4 scroll-mt-6"
-                >
-                  <h2 className={commonStyles.secondaryTitle + " text-blue-800 mb-1"}>{pdfName}</h2>
-                  <p className={commonStyles.auxiliaryText + " text-blue-600"}>{items.length} 个内容项</p>
-                </div>
+            {selectedPdf ? (
+              // 显示选中PDF的内容
+              Object.entries(groupedContents).length > 0 ? (
+                Object.entries(groupedContents).map(([pdfName, items]) => (
+                  <div key={pdfName} className="space-y-4">
+                    {/* PDF分组标题 - 添加ref用于定位 */}
+                    <div 
+                      ref={el => pdfRefs.current[pdfName] = el}
+                      className="bg-blue-50 border border-blue-200 rounded-lg p-4 scroll-mt-6"
+                    >
+                      <h2 className={commonStyles.secondaryTitle + " text-blue-800 mb-1"}>{pdfName}</h2>
+                      <p className={commonStyles.auxiliaryText + " text-blue-600"}>{items.length} 个内容项</p>
+                    </div>
                 
                 {/* 该PDF下的所有内容 */}
                 <div className="space-y-6">
@@ -580,7 +588,32 @@ export default function ReportEditor({ searchResults, onBack }) {
                   ))}
                 </div>
               </div>
-            ))}
+            ))
+              ) : (
+                // 选中PDF但没有内容的情况
+                <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                  <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">暂无内容</h3>
+                  <p className="text-gray-500 text-center max-w-md">
+                    当前选中的PDF「{selectedPdf}」中没有找到符合条件的正文内容。
+                    <br />请尝试选择其他PDF文档或检查搜索条件。
+                  </p>
+                </div>
+              )
+            ) : (
+              // 没有选中PDF的情况
+              <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+                <svg className="w-16 h-16 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">请选择PDF文档</h3>
+                <p className="text-gray-500 text-center max-w-md">
+                  请从左侧文档列表中选择一个PDF文档来查看和编辑其内容。
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>

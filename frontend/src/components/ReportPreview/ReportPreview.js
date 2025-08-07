@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import PdfViewer from '../PdfViewer/PdfViewer';
+import { buildFileUrl } from '../../config/apiConfig';
 
 export default function ReportPreview({ report, onSelect }) {
   const [showJson, setShowJson] = useState(false);
@@ -11,7 +12,7 @@ export default function ReportPreview({ report, onSelect }) {
     fileName += '.pdf';
   }
   const encodedFile = encodeURIComponent(fileName);
-  const fileUrl = `http://aireportbackend.s7.tunnelfrp.com/pdfs/${encodedFile}`;
+  const fileUrl = buildFileUrl(fileName);
   console.log('fileUrl:', fileUrl);
   const pageNum = Number(report.page_num);
   console.log('page_num:', pageNum);

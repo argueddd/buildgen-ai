@@ -1,26 +1,46 @@
 import subprocess
 from pathlib import Path
-from tqdm import tqdm
 
-input_dir = Path("./data/JG/")
-output_dir = Path("./data/output/")
-mineru_exe = "mineru"
-
-# 获取所有 PDF 文件
-pdf_files = list(input_dir.glob("*.pdf"))
-total = len(pdf_files)
-
-print(f"共找到 {total} 个 PDF 文件，开始处理...\n")
-
-for pdf_path in tqdm(pdf_files, desc="Processing PDFs", ncols=80):
-    print(f"\n🔹 正在处理: {pdf_path.name}")
-    cmd = [
-        mineru_exe,
-        "-p", str(pdf_path),
-        "-o", str(output_dir)
-    ]
+def convert_pdf_to_markdown(pdf_path, output_dir):
+    """使用mineru将PDF转换为Markdown"""
     try:
-        subprocess.run(cmd, check=True)  # 输出会直接在终端显示
-        print(f"✅ 处理完成: {pdf_path.name}")
-    except subprocess.CalledProcessError:
-        print(f"❌ 处理失败: {pdf_path.name}")
+        mineru_exe = "mineru"
+        
+        cmd = [
+            mineru_exe,
+            "-p", pdf_path,
+            "-o", output_dir,
+            "--source", "modelscope"
+        ]
+        
+        subprocess.run(
+            cmd,
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="ignore"
+        )
+        
+        # 获取PDF文件名（不含扩展名）
+        pdf_name = Path(pdf_path).stem
+        
+        # mineru生成的结构是: output_dir/{pdf_name}/auto/{pdf_name}.md
+        md_path = Path(output_dir) / pdf_name / "auto" / f"{pdf_name}.md"
+        
+        if md_path.exists():
+            return str(md_path)
+        
+        # 如果上面的路径不存在，尝试查找其他可能的路径
+        md_files = list(Path(output_dir).rglob("*.md"))
+        if md_files:
+            return str(md_files[0])
+        
+        return None
+        
+    except subprocess.CalledProcessError as e:
+        print(f"mineru转换失败: {e}")
+        return None
+    except Exception as e:
+        print(f"转换过程出错: {e}")
+        return None

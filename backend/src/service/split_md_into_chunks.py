@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 class MarkdownSectionClassifier:
     """
-    用于判断当前 Markdown 所在部分属于“正文”还是“条文说明”。
+    用于判断当前 Markdown 所在部分属于“正文”还是“条文说明”?
     """
     def __init__(self):
         self.in_explanation_section = False
@@ -27,8 +27,8 @@ class MarkdownSectionClassifier:
 
 class MarkdownChunker:
     """
-    将 Markdown 文本切分为结构化章节块，并标注 text_role（正文 / 条文说明）。
-    对于内容长度小于 min_content_chars 的块，尝试合并子章节以增强上下文。
+    �?Markdown 文本切分为结构化章节块，并标�?text_role（正�?/ 条文说明）�?
+    对于内容长度小于 min_content_chars 的块，尝试合并子章节以增强上下文�?
     """
     def __init__(self, md_text: str, min_content_chars: int = 50):
         self.md_text = md_text
@@ -44,7 +44,7 @@ class MarkdownChunker:
         self.classifier = MarkdownSectionClassifier()
 
     def _flush_buffer(self):
-        if self.current_section and any(line.strip() for line in self.current_buffer):  # 避免空 chunk
+        if self.current_section and any(line.strip() for line in self.current_buffer):  # 避免�?chunk
             content = "\n".join(self.current_buffer).strip()
             self.chunks.append({
                 "section": self.current_section,
@@ -59,7 +59,7 @@ class MarkdownChunker:
         for line in self.lines:
             if line.strip().lstrip("#").strip() == "条文说明":
                 self.classifier.update_state(line)
-                continue  # 不参与 chunk，纯粹标记状态切换
+                continue  # 不参�?chunk，纯粹标记状态切�?
 
             self.classifier.update_state(line)
 
@@ -136,8 +136,8 @@ class MarkdownChunker:
 
 def match_explanation_pairs(chunks: List[Dict]) -> List[Dict]:
     """
-    匹配正文与条文说明的对应关系，基于 section 编号。
-    返回一个包含两类 text_role 对应条目的列表。
+    匹配正文与条文说明的对应关系，基于section 编号
+    返回一个包含两text_role 对应条目的列表
     """
     section_map = {}
     for chunk in chunks:
@@ -159,18 +159,18 @@ def match_explanation_pairs(chunks: List[Dict]) -> List[Dict]:
             result.append({
                 "section": section,
                 "title": title,
-                "正文": roles.get("正文", {}).get("content", ""),  # 返回content字段的文本内容
-                "条文说明": roles.get("条文说明", {}).get("content", "")  # 返回content字段的文本内容
+                "正文": roles.get("正文", {}).get("content", ""),  # 返回content字段的文本内�?
+                "条文说明": roles.get("条文说明", {}).get("content", "")  # 返回content字段的文本内�?
             })
     return result
 
 # 示例使用
 if __name__ == "__main__":
     from backend.app import update_processing_status, save_chunks_to_milvus
-    from backend.src.service.question_generator import generate_questions_for_chunk
+    from src.service.question_generator import generate_questions_for_chunk
     output_dir = "data/output"
 
-    # 获取所有子文件夹
+    # 获取所有子文件�?
     folder_names = [name for name in os.listdir(output_dir) if os.path.isdir(os.path.join(output_dir, name))]
 
     # tqdm 包装子文件夹遍历
@@ -193,7 +193,7 @@ if __name__ == "__main__":
                 # 生成问题
                 questions_tag_dict = generate_questions_for_chunk(chunk)
                 print(f"生成结果: {questions_tag_dict}")
-                # 将问题和tags添加到chunk中
+                # 将问题和tags添加到chunk�?
                 chunk.update(questions_tag_dict)
             except Exception as e:
                 print(f"为chunk {i + 1}生成问题失败: {e}")
@@ -206,10 +206,10 @@ if __name__ == "__main__":
                 })
 
         update_processing_status(file_id, 'processing', f'存储到数据库 ({len(chunks)} chunks)...', 5, 5)
-        print(f"开始存储 {len(chunks)} 个chunks到Milvus...")
+        print(f"开始存{len(chunks)} 个chunks到Milvus...")
         save_chunks_to_milvus(chunks, filename, "specs_architecture_v1")
 
-        # 完成: 更新处理信息为完成状态
+        # 完成: 更新处理信息为完成状�?
         processed_info = {
             'id': file_id,
             'original_name': filename,
